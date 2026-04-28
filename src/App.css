@@ -689,6 +689,11 @@ body {
     padding: var(--space-md);
   }
 
+  /* 移动端隐藏空列，不占位 */
+  .kanban-col:has(.kanban-col__body > .col-empty:only-child) {
+    display: none;
+  }
+
   .sidebar {
     border-left: none;
     border-top: 1px solid var(--border);
