@@ -66,19 +66,21 @@ app.patch('/:id', async (c) => {
   if (body.status === 'done') { sets.push('done_at = ?'); vals.push(now) }
   vals.push(c.req.param('id'))
   await c.env.DB.prepare(`UPDATE tasks SET ${sets.join(', ')} WHERE id = ?`).bind(...vals).run()
+  const eventKind =
+    body.status === 'done'    ? 'task_done' :
+    body.status === 'blocked' ? 'task_blocked' :
+    body.status === 'review'  ? 'task_review' :
+    body.status === 'doing'   ? 'task_started' : 'task_progress'
   await c.env.DB.prepare(`
     INSERT INTO events (kind, task_id, payload, created_at)
     VALUES (?, ?, ?, ?)
-  `).bind(
-    body.status === 'done' ? 'task_done' : body.status === 'blocked' ? 'task_blocked' : 'task_progress',
-    c.req.param('id'), JSON.stringify(body), now
-  ).run()
+  `).bind(eventKind, c.req.param('id'), JSON.stringify(body), now).run()
   return c.json({ ok: true })
 })
 
 app.delete('/:id', async (c) => {
-  await c.env.DB.prepare("UPDATE tasks SET status = 'cancelled', updated_at = ? WHERE id = ?")
-    .bind(Date.now(), c.req.param('id')).run()
+  // hard delete (cancelled 状态在新 enum 中被移除)
+  await c.env.DB.prepare('DELETE FROM tasks WHERE id = ?').bind(c.req.param('id')).run()
   return c.json({ ok: true })
 })
 

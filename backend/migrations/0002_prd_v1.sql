@@ -23,10 +23,10 @@ CREATE TABLE IF NOT EXISTS tasks (
   description    TEXT,
   assignee_id    TEXT,
   assigner_id    TEXT NOT NULL,
-  status         TEXT NOT NULL DEFAULT 'pending'
-                 CHECK (status IN ('pending','in_progress','blocked','done','cancelled')),
+  status         TEXT NOT NULL DEFAULT 'todo'
+                 CHECK (status IN ('todo','doing','review','done','blocked')),
   priority       TEXT NOT NULL DEFAULT 'P2'
-                 CHECK (priority IN ('P0','P1','P2')),
+                 CHECK (priority IN ('P0','P1','P2','P3')),
   parent_id      TEXT,                 -- 依赖父任务 (依赖图 v1 由此推导)
   source         TEXT NOT NULL DEFAULT 'web'
                  CHECK (source IN ('web','discord')),
@@ -51,6 +51,8 @@ CREATE TABLE IF NOT EXISTS comments (
   task_id        TEXT NOT NULL,
   author_id      TEXT NOT NULL,        -- agents.id
   body           TEXT NOT NULL,
+  parent_id      INTEGER,              -- nullable, threaded 预留 (Kane 17:51 拍)
+  mentions       TEXT,                 -- nullable JSON 数组 of agent ids
   discord_msg_id TEXT,
   created_at     INTEGER NOT NULL
 );
@@ -61,7 +63,7 @@ CREATE TABLE IF NOT EXISTS events (
   id             INTEGER PRIMARY KEY AUTOINCREMENT,
   kind           TEXT NOT NULL CHECK (kind IN (
                    'task_assigned','task_started','task_progress','task_done',
-                   'task_blocked','task_commented','agent_status',
+                   'task_blocked','task_review','task_commented','agent_status',
                    'msg_in','msg_out','report_generated'
                  )),
   agent_id       TEXT,

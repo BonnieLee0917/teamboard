@@ -56,11 +56,14 @@ app.post('/events', async (c) => {
     const task = await c.env.DB.prepare('SELECT id, status FROM tasks WHERE discord_msg_id = ?')
       .bind(evt.referenced_message_id).first<{ id: string; status: string }>()
     if (task) {
-      const lower = evt.content.toLowerCase()
-      let newStatus: string | null = null
-      if (/完成|done|finished|✅/.test(lower))   newStatus = 'done'
-      else if (/阻塞|blocked|⛔/.test(lower))   newStatus = 'blocked'
-      else if (/进行中|wip|开始/.test(lower))    newStatus = 'in_progress'
+      // Kane 17:51 拍的入向语义规则
+      const text = evt.content
+      const lower = text.toLowerCase()
+      let newStatus: 'done' | 'blocked' | 'review' | 'doing' | null = null
+      if (/完成|done|finished|搞定|✅/i.test(text))                            newStatus = 'done'
+      else if (/阻塞|blocked|卡住|卡死|被挡住|⛔/i.test(text))                  newStatus = 'blocked'
+      else if (/评审|review|待看|请过目/i.test(text))                            newStatus = 'review'
+      else if (/进行中|在做|处理中|working on|started|wip/.test(lower))    newStatus = 'doing'
 
       const now = Date.now()
       if (newStatus) {
