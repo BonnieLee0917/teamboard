@@ -27,6 +27,7 @@ CREATE TABLE IF NOT EXISTS tasks (
                  CHECK (status IN ('pending','in_progress','blocked','done','cancelled')),
   priority       TEXT NOT NULL DEFAULT 'P2'
                  CHECK (priority IN ('P0','P1','P2')),
+  parent_id      TEXT,                 -- 依赖父任务 (依赖图 v1 由此推导)
   source         TEXT NOT NULL DEFAULT 'web'
                  CHECK (source IN ('web','discord')),
   discord_msg_id TEXT,
@@ -37,19 +38,12 @@ CREATE TABLE IF NOT EXISTS tasks (
 );
 CREATE INDEX IF NOT EXISTS idx_tasks_assignee  ON tasks(assignee_id);
 CREATE INDEX IF NOT EXISTS idx_tasks_status    ON tasks(status);
+CREATE INDEX IF NOT EXISTS idx_tasks_parent    ON tasks(parent_id);
 CREATE INDEX IF NOT EXISTS idx_tasks_scheduled ON tasks(scheduled_for);
 
 -- ─── dependencies ──────────────────────────────
--- 依赖图：task A blocked_by task B
-CREATE TABLE IF NOT EXISTS dependencies (
-  id         INTEGER PRIMARY KEY AUTOINCREMENT,
-  task_id    TEXT NOT NULL,            -- 被阻塞的任务
-  depends_on TEXT NOT NULL,            -- 前置任务
-  created_at INTEGER NOT NULL,
-  UNIQUE(task_id, depends_on)
-);
-CREATE INDEX IF NOT EXISTS idx_deps_task ON dependencies(task_id);
-CREATE INDEX IF NOT EXISTS idx_deps_on   ON dependencies(depends_on);
+-- Bonnie 17:22 拍：v1 不建独立表，依赖关系从 tasks.parent_id 推导。
+-- 此节作为 schema 文档锚点保留。
 
 -- ─── comments ──────────────────────────────────
 CREATE TABLE IF NOT EXISTS comments (

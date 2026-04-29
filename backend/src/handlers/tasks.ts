@@ -35,10 +35,10 @@ app.post('/', async (c) => {
   const id = uid()
   const now = Date.now()
   await c.env.DB.prepare(`
-    INSERT INTO tasks (id, title, description, assignee_id, assigner_id, priority, scheduled_for, created_at, updated_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    INSERT INTO tasks (id, title, description, assignee_id, assigner_id, priority, parent_id, scheduled_for, created_at, updated_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).bind(id, body.title, body.description ?? null, body.assignee_id ?? null, body.assigner_id,
-           body.priority ?? 'P2', body.scheduled_for ?? null, now, now).run()
+           body.priority ?? 'P2', body.parent_id ?? null, body.scheduled_for ?? null, now, now).run()
 
   // Insert event
   await c.env.DB.prepare(`

@@ -1,7 +1,12 @@
 # Teamboard Backend Architecture (draft)
 
-> 状态：Pre-PRD draft · 4/29 17:10 · 待 Bonnie 17:30 PRD 校准
-> ship deadline: **4/30 16:00**
+> 状态：baseline 锁 · 4/29 17:30 · 跟 PRD A+丙+ii 对齐
+> ship deadline: **4/30 20:00**
+>
+> **数据派生约定（Bonnie 17:22 拍）：**
+> - `dependencies` = 由 `tasks.parent_id` 推导的只读 DAG（非独立表）
+> - `schedule` = 由 `tasks.scheduled_for` 推导的只读时间轴
+> - `comments` = 独立表（方案 A）；threaded 通过 `task_id` + `created_at ASC` 拉，不做嵌套 reply
 
 ## 1. Stack
 
@@ -31,8 +36,12 @@ GET    /api/reports?date=YYYY-MM-DD      → Report
 GET    /api/reports/today                → Report
 POST   /api/reports/generate             → 强制生成（admin）
 
-GET    /api/dependencies                 → { nodes: Task[], edges: [{from,to}] }（依赖图只读 v1）
-GET    /api/schedule                     → Task[]（scheduled_for IS NOT NULL）
+GET    /api/dependencies                 → { nodes: Task[], edges: [{from:parent_id,to:id}] }（v1 只读，从 tasks.parent_id 推导）
+GET    /api/schedule                     → Task[]（scheduled_for IS NOT NULL，按 ASC）
+
+# Comments (方案 A：独立 comments 表)
+GET    /api/tasks/:id/comments           → Comment[]
+POST   /api/tasks/:id/comments           body: { author_id, body }
 
 # Realtime
 GET    /api/stream                       → WebSocket upgrade，server push 所有 activity 事件
