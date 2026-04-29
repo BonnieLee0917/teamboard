@@ -46,9 +46,10 @@
    - 工具类 / 内部协作 / 现代浏览器为主（覆盖 ≥90%）→ **不写**
    - C 端泛人群 / 老旧设备占比有数据证明 >10% → 评估 fallback
 
-3. **团队栈是否已默认采用？**
-   - 同公司其他项目已在用、团队默认假设 → **不写**（写了反而破坏一致性）
-   - 首个引入此 feature 的项目 → 在 `_baseline.md` 显式登记后再决定
+3. **复杂度对称否？**
+   - **量化错点：fallback 复杂度 ≤ 原方案 1.5x** → 可写
+   - 超过 1.5x 视为不对称，放弃 fallback
+   - 衡量参考：代码行数 / 依赖层（CSS-only → JS+state 同步属于跨层，默认 >1.5x） / 运行时开销（reflow / hydrate）
 
 ### 案例：`:has()` 在 teamboard
 
@@ -56,7 +57,7 @@
 | --- | --- |
 | 降级行为破坏功能？ | ❌ 老浏览器 fallback = 空列照常显示，graceful degrade |
 | 用户在老浏览器？ | ❌ 团队协作工具，PC + 移动端核心人群在 Chrome 105+ / Safari 15.4+，覆盖 ~93% |
-| 团队栈是否已默认？ | ✅ GemBlitz Roguelike 卡牌、Tower Storm 塔位提示均已使用 |
+| 复杂度对称否？ | ❌ JS state 同步链路跨层，远超 1.5x 阈值（一行 CSS → JS+数据监听+class toggle+hydrate） |
 
 → **不写 fallback**。
 
