@@ -1,0 +1,20 @@
+{
+  "name": "teamboard-api",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "db:apply:local": "wrangler d1 execute teamboard-prod --local --file=migrations/0002_prd_v1.sql",
+    "db:apply:prod":  "wrangler d1 execute teamboard-prod --remote --file=migrations/0002_prd_v1.sql",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "hono": "^4.6.0"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20240909.0",
+    "typescript": "~5.6.2",
+    "wrangler": "^3.78.0"
+  }
+}
