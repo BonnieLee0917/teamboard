@@ -36,8 +36,15 @@ app.post('/', async (c) => {
   }
 
   const confidence = (assignee_id ? 0.4 : 0) + (action ? 0.3 : 0) + (title.length > 3 ? 0.3 : 0.1)
+  const confidence_band: 'high' | 'medium' | 'low' =
+    confidence >= 0.7 ? 'high' : confidence >= 0.4 ? 'medium' : 'low'
 
-  return c.json({ assignee_id, assignee_name, action, title, when, raw: input, confidence })
+  // Lightweight target extraction: #数字 / PR \w+ / 引号串
+  let target: string | null = null
+  const m = title.match(/("[^"]+"|PR\s*#?\d+|#\d+|[A-Z]{2,}-\d+)/i)
+  if (m) target = m[0]
+
+  return c.json({ assignee_id, assignee_name, action, target, title, when, raw: input, confidence, confidence_band })
 })
 
 export default app
