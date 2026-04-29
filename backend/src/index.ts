@@ -36,6 +36,7 @@ app.use('/api/*', async (c, next) => {
 // ── Route imports ─────────────────────────────────────────────────────────
 import agents from './handlers/agents'
 import tasks from './handlers/tasks'
+import comments from './handlers/comments'
 import events from './handlers/events'
 import reports from './handlers/reports'
 import deps from './handlers/deps'
@@ -47,6 +48,7 @@ import settings from './handlers/settings'
 
 app.route('/api/agents', agents)
 app.route('/api/tasks', tasks)
+app.route('/api/tasks', comments)  // mounts /:id/comments
 app.route('/api/feed', events)
 app.route('/api/reports', reports)
 app.route('/api/dependencies', deps)
