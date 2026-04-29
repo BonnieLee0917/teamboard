@@ -14,7 +14,9 @@ app.get('/', async (c) => {
   const assignee = url.searchParams.get('assignee')
   let sql = 'SELECT * FROM tasks WHERE 1=1'
   const vals: unknown[] = []
+  // UI 默认不返 cancelled；显式传 status=cancelled 才能看到
   if (status)   { sql += ' AND status = ?';      vals.push(status) }
+  else          { sql += " AND status != 'cancelled'" }
   if (assignee) { sql += ' AND assignee_id = ?'; vals.push(assignee) }
   sql += ' ORDER BY created_at DESC'
   const { results } = await c.env.DB.prepare(sql).bind(...vals).all()
@@ -79,8 +81,9 @@ app.patch('/:id', async (c) => {
 })
 
 app.delete('/:id', async (c) => {
-  // hard delete (cancelled 状态在新 enum 中被移除)
-  await c.env.DB.prepare('DELETE FROM tasks WHERE id = ?').bind(c.req.param('id')).run()
+  // 软删: cancelled 为后端隐藏态，UI 默认不暴露 (Vivian 17:59 拍)
+  await c.env.DB.prepare("UPDATE tasks SET status = 'cancelled', updated_at = ? WHERE id = ?")
+    .bind(Date.now(), c.req.param('id')).run()
   return c.json({ ok: true })
 })
 

@@ -24,7 +24,9 @@ CREATE TABLE IF NOT EXISTS tasks (
   assignee_id    TEXT,
   assigner_id    TEXT NOT NULL,
   status         TEXT NOT NULL DEFAULT 'todo'
-                 CHECK (status IN ('todo','doing','review','done','blocked')),
+                 CHECK (status IN ('todo','doing','review','done','blocked','cancelled')),
+                 -- UI 可见: todo|doing|review|done|blocked
+                 -- 'cancelled' = 后端软删隐藏态，不进主屏枚举/筛选/badge
   priority       TEXT NOT NULL DEFAULT 'P2'
                  CHECK (priority IN ('P0','P1','P2','P3')),
   parent_id      TEXT,                 -- 依赖父任务 (依赖图 v1 由此推导)
