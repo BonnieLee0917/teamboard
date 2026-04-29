@@ -1,0 +1,53 @@
+#!/usr/bin/env bash
+# pre-commit hook: 拦截 lockfile 内网镜像污染
+# 安装：cp scripts/hooks/pre-commit .git/hooks/pre-commit && chmod +x .git/hooks/pre-commit
+# 或：git config core.hooksPath scripts/hooks
+
+set -e
+
+# 仅在 lockfile 被 stage 时检查
+LOCKFILES=$(git diff --cached --name-only | grep -E '(package-lock\.json|yarn\.lock|pnpm-lock\.yaml)$' || true)
+
+if [ -z "$LOCKFILES" ]; then
+  exit 0
+fi
+
+FORBIDDEN_PATTERNS=(
+  "mirrors.tencentyun.com"
+  "mirrors.aliyun.com/npm"
+  "registry.npmmirror.com"
+  "registry.npm.taobao.org"
+)
+
+FOUND=0
+for f in $LOCKFILES; do
+  for pat in "${FORBIDDEN_PATTERNS[@]}"; do
+    if git show ":$f" | grep -q "$pat"; then
+      echo "❌ $f contains forbidden registry: $pat"
+      FOUND=1
+    fi
+  done
+done
+
+if [ $FOUND -eq 1 ]; then
+  cat <<EOF
+
+🚫 Commit blocked: lockfile 包含内网/国内镜像 URL
+   海外构建机（Cloudflare Pages / Vercel / GitHub Actions）访问不通，
+   会导致 npm ci 卡死后崩溃 (Exit handler never called!)
+
+修复：
+  sed -i 's|http://mirrors.tencentyun.com/npm/|https://registry.npmjs.org/|g' package-lock.json
+  # 重装验证
+  rm -rf node_modules && npm ci
+
+或者重新生成 lockfile：
+  npm config set registry https://registry.npmjs.org/
+  rm package-lock.json && npm install
+
+跳过本检查（不推荐）：git commit --no-verify
+EOF
+  exit 1
+fi
+
+exit 0
