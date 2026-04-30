@@ -689,11 +689,6 @@ body {
     padding: var(--space-md);
   }
 
-  /* 移动端隐藏空列，不占位 */
-  .kanban-col:has(.kanban-col__body > .col-empty:only-child) {
-    display: none;
-  }
-
   .sidebar {
     border-left: none;
     border-top: 1px solid var(--border);
@@ -730,4 +725,104 @@ body {
   .mobile-hidden, .mobile-visible {
     /* no-op on desktop */
   }
+}
+
+/* ─── Confidence Band (Vivian 4/30 · task-card 级别，来自 /api/parse) ─── */
+:root {
+  --cf-high: #10b981;
+  --cf-medium:  #f59e0b;
+  --cf-low:  #ef4444;
+  --cf-neutral-bg:     #141414;
+  --cf-neutral-border: #2a2a2a;
+}
+.task-card { transition: border-color .2s; }
+.task-card[data-confidence="high"] { border-left: 3px solid var(--cf-high); }
+.task-card[data-confidence="medium"]  { border-left: 3px solid var(--cf-medium);  }
+.task-card[data-confidence="low"]  { border-left: 3px solid var(--cf-low);  }
+/* 未匹配（含 undefined / 未知第四值）= 中性，不降级到 low（Vivian 容错 baseline） */
+.task-card:not([data-confidence="high"]):not([data-confidence="medium"]):not([data-confidence="low"]) {
+  border-left: 3px solid var(--cf-neutral-border);
+}
+
+/* ─── Agent member-card status (Vivian 4/30 · teamboard-agent-status.md · idle/active/blocked/offline) ─── */
+.agent-card {
+  position: relative;
+  display: flex; gap: 12px; align-items: center;
+  padding: 12px 16px 12px 20px;
+  border-radius: 10px;
+  background: #141414;
+  transition: opacity .2s ease;
+}
+.agent-card::before {
+  content: ""; position: absolute;
+  left: 0; top: 8px; bottom: 8px; width: 3px;
+  border-radius: 0 2px 2px 0;
+  background: var(--rail);
+}
+.agent-card[data-agent-status="idle"]    { --rail: #4A4A4A; }
+.agent-card[data-agent-status="active"]  { --rail: #2EBE7A; }
+.agent-card[data-agent-status="blocked"] { --rail: #D4524C; }
+.agent-card[data-agent-status="offline"] { --rail: #2A2A2A; opacity: 0.55; }
+.agent-card:not([data-agent-status="idle"]):not([data-agent-status="active"]):not([data-agent-status="blocked"]):not([data-agent-status="offline"]) {
+  --rail: transparent;
+}
+
+/* ─── Staleness (Vivian 4/30 第 7 节) ─── */
+.event-time[data-staleness="fresh"] { color: #9aa0a6; }
+.event-time[data-staleness="stale"] { color: #7a6a4a; }
+.event-time[data-staleness="cold"]  { color: #5a4a40; font-style: italic; }
+
+/* ─── Feed States (Vivian 4/30 · teamboard-feed-states.md §4 · data-feed-state 单点态机) ─── */
+:root {
+  --feed-stale-bg:     #2a2410;
+  --feed-stale-fg:     #d4a84b;
+  --feed-stale-border: #4a3a18;
+  --feed-failed-bg:     #2a1414;
+  --feed-failed-fg:     #e87060;
+  --feed-failed-border: #4a1c1c;
+}
+
+/* skeleton shimmer for loading 态 */
+.app[data-feed-state="loading"] .activity-feed__list {
+  position: relative;
+  min-height: 240px;
+}
+.app[data-feed-state="loading"] .activity-feed__list::after {
+  content: "";
+  position: absolute; inset: 0;
+  background: linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.04) 50%, transparent 100%);
+  background-size: 200% 100%;
+  animation: feed-shimmer 1.4s linear infinite;
+  pointer-events: none;
+}
+@keyframes feed-shimmer {
+  from { background-position: 200% 0; }
+  to   { background-position: -200% 0; }
+}
+
+/* polling-stale banner — 黄，常驻 */
+[data-testid="polling-stale-banner"] {
+  background: var(--feed-stale-bg) !important;
+  color: var(--feed-stale-fg) !important;
+  border-bottom: 1px solid var(--feed-stale-border) !important;
+}
+
+/* failed banner — 红，常驻按钮 */
+[data-testid="polling-failed-banner"] {
+  background: var(--feed-failed-bg) !important;
+  color: var(--feed-failed-fg) !important;
+  border-bottom: 1px solid var(--feed-failed-border) !important;
+}
+[data-testid="polling-failed-retry"] {
+  background: var(--feed-failed-fg) !important;
+  color: #1a0a0a !important;
+  font-weight: 600;
+  transition: filter .15s ease;
+}
+[data-testid="polling-failed-retry"]:hover { filter: brightness(1.1); }
+[data-testid="polling-failed-retry"]:active { filter: brightness(0.9); }
+
+/* failed 态保留旧数据（陈旧 > 空白），整层略微降饱和提示 */
+.app[data-feed-state="failed"] .activity-feed__list {
+  filter: saturate(0.7);
 }

@@ -1,6 +1,8 @@
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import type { SprintState, Task, ActivityItem, TaskStatus, MemberId } from './types'
+import type { Agent } from './types-api'
 import { mockData } from './mockData'
+import { pollSprintState, getAgents, apiConfig, ApiError } from './lib/api'
 import './App.css'
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -62,6 +64,7 @@ function TaskCard({ task, isExpanded, onToggle }: {
       tabIndex={0}
       onKeyDown={e => e.key === 'Enter' && onToggle()}
       data-testid="task-card"
+      data-confidence={task.confidence_band}
     >
       <div className="task-card__header">
         <span className="task-id">{task.id}</span>
@@ -208,7 +211,7 @@ function SprintBar({ tasks, sprintName }: { tasks: Task[]; sprintName: string })
 
 function ActivityFeed({ items }: { items: ActivityItem[] }) {
   return (
-    <div className="activity-feed">
+    <div className="activity-feed" data-testid="feed">
       <div className="activity-feed__title">动态</div>
       <div className="activity-feed__list">
         {items.map(item => (
@@ -266,8 +269,9 @@ function MemberBar({ tasks }: { tasks: Task[] }) {
 
 // ─── MembersView ──────────────────────────────────────────────────────────────
 
-function MembersView({ tasks }: { tasks: Task[] }) {
+function MembersView({ tasks, agents }: { tasks: Task[]; agents: Agent[] }) {
   const members: MemberId[] = ['Bonnie', 'Kane', 'Haaland', 'Vivian', 'Rose']
+  const agentByName = new Map(agents.map(a => [a.name, a]))
 
   return (
     <div className="members-view">
@@ -276,11 +280,21 @@ function MembersView({ tasks }: { tasks: Task[] }) {
         const active = myTasks.filter(t => t.status === 'in-progress' || t.status === 'review')
         const done = myTasks.filter(t => t.status === 'done')
         const blocked = myTasks.filter(t => t.status === 'blocked')
+        const agent = agentByName.get(m)
         return (
-          <div key={m} className="member-card">
+          <div
+            key={m}
+            className="member-card agent-card"
+            data-agent-status={agent?.status}
+          >
             <div className="member-card__header" style={{ borderColor: MEMBER_COLORS[m] }}>
               <span className="member-card__emoji">{MEMBER_EMOJI[m]}</span>
               <span className="member-card__name">{m}</span>
+              {agent && (
+                <span className="member-card__role" style={{ fontSize: 11, opacity: 0.7, marginLeft: 6 }}>
+                  {agent.role} · {agent.status}
+                </span>
+              )}
               <span className="member-card__counts">
                 {active.length > 0 && <span className="mc-stat mc-active">{active.length} 活跃</span>}
                 {done.length > 0 && <span className="mc-stat mc-done">{done.length} 完成</span>}
@@ -310,19 +324,43 @@ const STATUSES: TaskStatus[] = ['pending', 'in-progress', 'review', 'done', 'blo
 
 export default function App() {
   const [data, setData] = useState<SprintState>(mockData)
+  const [agents, setAgents] = useState<Agent[]>([])
+  const [feedState, setFeedState] = useState<'loading' | 'ok' | 'polling-stale' | 'failed'>('loading')
   const [expandedId, setExpandedId] = useState<string | null>(null)
   const [mobileTab, setMobileTab] = useState<'kanban' | 'members' | 'activity'>('kanban')
-  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const [apiErr, setApiErr] = useState<ApiError | null>(null)
+  const handleRef = useRef<import('./lib/api').PollHandle | null>(null)
 
-  // 5s 轮询（mock: 随机更新 updatedAt 模拟刷新）
-  const refreshData = useCallback(() => {
-    setData(prev => ({ ...prev, updatedAt: new Date().toISOString() }))
+  // 5s polling。feedState 每秒 tick 重评价，Vivian polling-stale banner attr(data-stale-text) 靠它
+  useEffect(() => {
+    handleRef.current = pollSprintState(
+      next => { setData(next); setApiErr(null) },
+      err => { console.warn('[poll]', err); setApiErr(err) },
+      5000,
+    )
+    const tick = setInterval(() => {
+      if (handleRef.current) setFeedState(handleRef.current.computeState())
+    }, 1000)
+    return () => { handleRef.current?.stop(); clearInterval(tick) }
   }, [])
 
+  // /api/agents 独立轮询（团队成员状态，Vivian confidence_band CSS 驱动源）
   useEffect(() => {
-    pollRef.current = setInterval(refreshData, 5000)
-    return () => { if (pollRef.current) clearInterval(pollRef.current) }
-  }, [refreshData])
+    if (!apiConfig.base) return
+    let stopped = false
+    const tick = async () => {
+      try {
+        const list = await getAgents()
+        if (!stopped) setAgents(list)
+      } catch (e) {
+        console.warn('[agents]', e)
+      } finally {
+        if (!stopped) setTimeout(tick, 5000)
+      }
+    }
+    void tick()
+    return () => { stopped = true }
+  }, [])
 
   const toggleExpanded = (id: string) =>
     setExpandedId(prev => prev === id ? null : id)
@@ -330,7 +368,7 @@ export default function App() {
   const tasksByStatus = (s: TaskStatus) => data.tasks.filter(t => t.status === s)
 
   return (
-    <div className="app">
+    <div className="app" data-feed-state={feedState}>
       {/* Top nav */}
       <header className="topnav">
         <div className="topnav__brand">
@@ -342,9 +380,41 @@ export default function App() {
         </div>
         <div className="topnav__right">
           <span className="last-update">刷新于 {timeAgo(data.updatedAt)}</span>
-          <span className="live-dot" title="自动刷新中" />
+          <span className="live-dot" title={apiErr ? `API: ${apiErr.message}` : `${apiConfig.mode} · 5s polling`} style={apiErr ? { background: '#ef4444' } : undefined} />
         </div>
       </header>
+      {/* Polling state banners (Vivian feed-states.md §4；Rose data-testid for smoke) */}
+      {feedState === 'polling-stale' && (
+        <div
+          data-testid="polling-stale-banner"
+          style={{ background: '#fef9c3', color: '#854d0e', padding: '6px 16px', fontSize: 13, borderBottom: '1px solid #fde68a' }}
+        >
+          ⚠️ 数据偏陈 · 最后一次同步 {handleRef.current?.lastSuccessAt ? timeAgo(new Date(handleRef.current.lastSuccessAt).toISOString()) : '未知'}
+        </div>
+      )}
+      {feedState === 'failed' && (
+        <div
+          data-testid="polling-failed-banner"
+          style={{ background: '#fef2f2', color: '#991b1b', padding: '6px 16px', fontSize: 13, borderBottom: '1px solid #fecaca', display: 'flex', alignItems: 'center', gap: 12 }}
+        >
+          <span>⚠️ 连接中断 · 显示上一帧数据</span>
+          <button
+            data-testid="polling-failed-retry"
+            onClick={() => handleRef.current?.fetchNow()}
+            style={{ background: '#991b1b', color: '#fff', border: 'none', padding: '4px 12px', borderRadius: 4, cursor: 'pointer', fontSize: 12 }}
+          >
+            重新连接
+          </button>
+        </div>
+      )}
+      {apiErr && feedState !== 'failed' && feedState !== 'polling-stale' && (
+        <div
+          data-testid="api-error-banner"
+          style={{ background: '#fef2f2', color: '#991b1b', padding: '6px 16px', fontSize: 13, borderBottom: '1px solid #fecaca' }}
+        >
+          ⚠️ API 异常 · {apiErr.endpoint} · {apiErr.status} · 显示上一帧数据，5s 后重试
+        </div>
+      )}
 
       {/* Sprint overview bar */}
       <div className="sprint-bar-wrapper">
@@ -389,7 +459,7 @@ export default function App() {
 
         {/* Members mobile view */}
         <div className={`members-panel ${mobileTab === 'members' ? 'mobile-visible' : 'mobile-hidden'}`}>
-          <MembersView tasks={data.tasks} />
+          <MembersView tasks={data.tasks} agents={agents} />
         </div>
       </main>
 

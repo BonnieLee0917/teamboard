@@ -27,6 +27,8 @@ export interface Task {
   requiresDesign: boolean
   attempts: number
   maxAttempts: number
+  /** Vivian/Kane 4/30 · 任务级 confidence（后续从 /api/parse 填入，未提供前为 undefined → 中性色板） */
+  confidence_band?: 'high' | 'medium' | 'low'
   createdAt: string
   updatedAt: string
   startedAt?: string

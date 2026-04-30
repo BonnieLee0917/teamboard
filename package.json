@@ -6,14 +6,8 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
-    "test": "echo \"no unit tests yet\" && exit 0",
     "lint": "eslint .",
-    "preview": "vite preview",
-    "setup": "git config core.hooksPath scripts/hooks && echo '✓ git hooks configured (scripts/hooks)'",
-    "postinstall": "node -e \"try{require('child_process').execSync('git config core.hooksPath scripts/hooks',{stdio:'ignore'})}catch(e){}\""
-  },
-  "engines": {
-    "node": ">=20"
+    "preview": "vite preview"
   },
   "dependencies": {
     "react": "^19.2.5",
