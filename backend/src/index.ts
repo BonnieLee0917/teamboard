@@ -24,9 +24,13 @@ app.use('*', cors({
 }))
 
 // Auth middleware (skip Discord webhook routes)
+// /api/stream accepts ?token=… query fallback because browser WebSocket API cannot set custom headers.
 app.use('/api/*', async (c, next) => {
   if (c.req.path.startsWith('/api/discord/')) return next()
-  const token = c.req.header('X-Teamboard-Token')
+  let token = c.req.header('X-Teamboard-Token')
+  if (!token && c.req.path.startsWith('/api/stream')) {
+    token = new URL(c.req.url).searchParams.get('token') ?? undefined
+  }
   if (token !== c.env.TEAMBOARD_TOKEN) {
     return c.json({ error: 'Unauthorized' }, 401)
   }

@@ -22,6 +22,17 @@ export class RoomDO {
       return new Response('ok')
     }
 
+    // POST /kick (internal, dev): close all current WS connections.
+    // Used to simulate server-initiated disconnect for client reconnect tests.
+    if (req.method === 'POST' && url.pathname === '/kick') {
+      const n = this.connections.size
+      for (const c of this.connections) {
+        try { c.ws.close(1012, 'kicked-by-test') } catch {}
+      }
+      this.connections.clear()
+      return new Response(String(n))
+    }
+
     // WebSocket upgrade
     const pair = new WebSocketPair()
     const client = pair[0]
