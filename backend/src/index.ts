@@ -54,13 +54,15 @@ import settings from './handlers/settings'
 app.route('/api/agents', agents)
 app.route('/api/tasks', tasks)
 app.route('/api/tasks', comments)  // mounts /:id/comments
-app.route('/api/feed', events)
+app.route('/api/events', events)
+app.route('/api/feed', events)   // legacy alias — keep until frontend migrated
 app.route('/api/reports', reports)
 app.route('/api/dependencies', deps)
 app.route('/api/schedule', schedule)
 app.route('/api/discord', discord)
 app.route('/api/parse', parse)
 app.route('/api/stream', stream)
+app.route('/ws', stream)          // PRD §11 WebSocket alias
 app.route('/api/settings', settings)
 
 // ── Cron (AI 日报) ────────────────────────────────────────────────────────

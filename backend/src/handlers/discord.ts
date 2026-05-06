@@ -5,25 +5,22 @@ const app = new Hono<{ Bindings: Env }>()
 
 // ── Ed25519 signature verify (Discord interactions) ─────────────────────
 async function verifyDiscord(req: Request, publicKey: string): Promise<{ ok: boolean; body: string }> {
-  const sig = req.headers.get('x-signature-ed25519')
-  const ts  = req.headers.get('x-signature-timestamp')
+  const sig  = req.headers.get('x-signature-ed25519')
+  const ts   = req.headers.get('x-signature-timestamp')
   const body = await req.text()
   if (!sig || !ts) return { ok: false, body }
-
   const enc = new TextEncoder()
   const key = await crypto.subtle.importKey(
     'raw', hexToBytes(publicKey),
     { name: 'Ed25519' }, false, ['verify']
   )
-  const ok = await crypto.subtle.verify(
-    'Ed25519', key, hexToBytes(sig), enc.encode(ts + body)
-  )
+  const ok = await crypto.subtle.verify('Ed25519', key, hexToBytes(sig), enc.encode(ts + body))
   return { ok, body }
 }
 
 function hexToBytes(hex: string): Uint8Array {
   const out = new Uint8Array(hex.length / 2)
-  for (let i = 0; i < out.length; i++) out[i] = parseInt(hex.slice(i*2, i*2+2), 16)
+  for (let i = 0; i < out.length; i++) out[i] = parseInt(hex.slice(i * 2, i * 2 + 2), 16)
   return out
 }
 
@@ -36,54 +33,111 @@ app.post('/interactions', async (c) => {
   return c.json({ type: 4, data: { content: 'received' } })
 })
 
-// ── Inbound message events (回执解析) ───────────────────────────────────
-// Auth: HMAC-SHA256(body) hex, header X-Tb-Sig
+// ── Inbound: Discord → TeamBoard ─────────────────────────────────────────
+// Auth: HMAC-SHA256(body) hex in header X-Tb-Sig (HMAC_SHARED_SECRET)
+//
+// Expected payload:
+//   { message_id, author_id, content, channel_id, referenced_message_id? }
+//
+// Token regex (from discord-protocol.md, must be whole-line match):
+//   ^\[task:(?<id>[a-zA-Z0-9_]+)\s+(?<verb>done|review|blocked|in_progress|todo)(?::\s*(?<note>.+?))?\]\s*$
+//
+// Layer A幂等: discord_message_id UNIQUE — 重复投递直接 ignore
+// Layer B幂等: 相同状态转换 → 静默 200 不写 events
+
+const TOKEN_RE = /^\[task:(?<id>[a-zA-Z0-9_]+)\s+(?<verb>done|review|blocked|in_progress|todo)(?::\s*(?<note>.+?))?\]\s*$/
+
+const VERB_TO_STATUS: Record<string, 'done' | 'review' | 'blocked' | 'doing' | 'todo'> = {
+  done: 'done',
+  review: 'review',
+  blocked: 'blocked',
+  in_progress: 'doing',
+  todo: 'todo',
+}
+
 app.post('/events', async (c) => {
   const sig  = c.req.header('x-tb-sig') ?? ''
   const body = await c.req.text()
-  const ok = await verifyHmac(body, sig, c.env.HMAC_SHARED_SECRET ?? '')
-  if (!ok) return c.text('invalid hmac', 401)
+  if (!(await verifyHmac(body, sig, c.env.HMAC_SHARED_SECRET ?? ''))) {
+    return c.text('invalid hmac', 401)
+  }
 
   const evt = JSON.parse(body) as {
     message_id: string
-    referenced_message_id?: string
     author_id: string
     content: string
+    channel_id?: string
+    referenced_message_id?: string
   }
 
-  // Find task by referenced discord msg id
-  if (evt.referenced_message_id) {
-    const task = await c.env.DB.prepare('SELECT id, status FROM tasks WHERE discord_msg_id = ?')
-      .bind(evt.referenced_message_id).first<{ id: string; status: string }>()
-    if (task) {
-      // Kane 17:51 拍的入向语义规则
-      const text = evt.content
-      const lower = text.toLowerCase()
-      let newStatus: 'done' | 'blocked' | 'review' | 'doing' | null = null
-      if (/完成|done|finished|搞定|✅/i.test(text))                            newStatus = 'done'
-      else if (/阻塞|blocked|卡住|卡死|被挡住|⛔/i.test(text))                  newStatus = 'blocked'
-      else if (/评审|review|待看|请过目/i.test(text))                            newStatus = 'review'
-      else if (/进行中|在做|处理中|working on|started|wip/.test(lower))    newStatus = 'doing'
-
-      const now = Date.now()
-      if (newStatus) {
-        await c.env.DB.prepare(
-          `UPDATE tasks SET status = ?, updated_at = ?, done_at = CASE WHEN ? = 'done' THEN ? ELSE done_at END WHERE id = ?`
-        ).bind(newStatus, now, newStatus, now, task.id).run()
-      }
-
-      // Always log as comment + event
-      await c.env.DB.prepare(
-        `INSERT INTO comments (task_id, author_id, body, discord_msg_id, created_at) VALUES (?,?,?,?,?)`
-      ).bind(task.id, evt.author_id, evt.content, evt.message_id, now).run()
-
-      await c.env.DB.prepare(
-        `INSERT INTO events (kind, agent_id, task_id, payload, discord_msg_id, created_at) VALUES (?,?,?,?,?,?)`
-      ).bind('msg_in', evt.author_id, task.id, JSON.stringify({ content: evt.content }), evt.message_id, now).run()
-    }
+  // Layer A: deduplicate by discord_message_id
+  const existing = await c.env.DB.prepare(
+    'SELECT id FROM events WHERE discord_msg_id = ? LIMIT 1'
+  ).bind(evt.message_id).first()
+  if (existing) {
+    return c.json({ ok: true, skipped: 'duplicate' })
   }
 
-  return c.json({ ok: true })
+  const text = evt.content.trim()
+  const match = TOKEN_RE.exec(text)
+
+  if (!match?.groups) {
+    // Not a task token — just a regular message reply, ignore silently
+    return c.json({ ok: true, skipped: 'no_token' })
+  }
+
+  const { id: taskId, verb, note } = match.groups
+  const newStatus = VERB_TO_STATUS[verb]
+  if (!newStatus) return c.json({ ok: true, skipped: 'unknown_verb' })
+
+  const task = await c.env.DB.prepare('SELECT id, status FROM tasks WHERE id = ?').bind(taskId).first<{ id: string; status: string }>()
+  if (!task) {
+    // system_error level=warn, silent to caller
+    await c.env.DB.prepare(
+      `INSERT INTO events (kind, agent_id, task_id, payload, discord_msg_id, created_at) VALUES ('report_generated',?,?,?,?,?)`
+    ).bind(evt.author_id, null, JSON.stringify({ type: 'system_error', level: 'warn', component: 'discord_inbound', error_msg: `task_id not found: ${taskId}` }), evt.message_id, Date.now()).run()
+    return c.json({ ok: true, skipped: 'task_not_found' })
+  }
+
+  const now = Date.now()
+
+  // Layer B: same status transition → silent 200
+  if (task.status === newStatus) {
+    // Still write dedup event so Layer A fires on retry
+    await c.env.DB.prepare(
+      `INSERT INTO events (kind, agent_id, task_id, payload, discord_msg_id, created_at) VALUES ('msg_in',?,?,?,?,?)`
+    ).bind(evt.author_id, task.id, JSON.stringify({ type: 'discord_inbound', content: text, skipped: 'same_status' }), evt.message_id, now).run()
+    return c.json({ ok: true, skipped: 'same_status' })
+  }
+
+  // Apply status update
+  let updateSql = 'UPDATE tasks SET status = ?, updated_at = ?'
+  const vals: unknown[] = [newStatus, now]
+  if (newStatus === 'done') {
+    updateSql += ', done_at = ?, completed_at = ?'
+    vals.push(now, now)
+  }
+  updateSql += ' WHERE id = ?'
+  vals.push(task.id)
+  await c.env.DB.prepare(updateSql).bind(...vals).run()
+
+  // Write comment
+  await c.env.DB.prepare(
+    `INSERT INTO comments (task_id, author_id, body, discord_msg_id, created_at) VALUES (?,?,?,?,?)`
+  ).bind(task.id, evt.author_id, text, evt.message_id, now).run()
+
+  // Write event (also acts as Layer A dedup anchor)
+  await c.env.DB.prepare(
+    `INSERT INTO events (kind, agent_id, task_id, payload, discord_msg_id, created_at) VALUES ('msg_in',?,?,?,?,?)`
+  ).bind(
+    evt.author_id,
+    task.id,
+    JSON.stringify({ type: 'task_updated', new_status: newStatus, note: note ?? null, source: 'discord' }),
+    evt.message_id,
+    now,
+  ).run()
+
+  return c.json({ ok: true, task_id: task.id, new_status: newStatus })
 })
 
 async function verifyHmac(body: string, sig: string, secret: string): Promise<boolean> {
@@ -92,7 +146,7 @@ async function verifyHmac(body: string, sig: string, secret: string): Promise<bo
   const key = await crypto.subtle.importKey(
     'raw', enc.encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']
   )
-  const mac = await crypto.subtle.sign('HMAC', key, enc.encode(body))
+  const mac  = await crypto.subtle.sign('HMAC', key, enc.encode(body))
   const expected = [...new Uint8Array(mac)].map(b => b.toString(16).padStart(2, '0')).join('')
   return timingSafeEqual(expected, sig)
 }
