@@ -83,6 +83,7 @@ export const mockData: SprintState = {
       createdAt: new Date(Date.now() - 3600000 * 4).toISOString(),
       updatedAt: new Date(Date.now() - 1200000).toISOString(),
       startedAt: new Date(Date.now() - 3600000 * 3).toISOString(),
+      doneAt: new Date(Date.now() - 1200000).toISOString(),
       gateResults: [
         {
           layer: 1,
@@ -114,6 +115,7 @@ export const mockData: SprintState = {
       createdAt: new Date(Date.now() - 3600000 * 3).toISOString(),
       updatedAt: new Date(Date.now() - 2400000).toISOString(),
       startedAt: new Date(Date.now() - 3600000 * 2).toISOString(),
+      doneAt: new Date(Date.now() - 2400000).toISOString(),
       gateResults: [
         {
           layer: 1,

@@ -212,8 +212,7 @@ function KanbanColumn({ status, tasks, expandedId, onToggle }: {
 // ─── CommandBar (formerly SprintBar) ──────────────────────────────────────────
 // Bonnie 5/6 v1.1: 去 Sprint 概念，改成「指挥台」语义
 //   active = todo+in_progress+review+blocked
-//   todayDone = done && updatedAt >= 今日 00:00 本地时区
-//   (前端 Task 类型无 doneAt，降级用 updatedAt — Bonnie 5/6 confirmed)
+//   todayDone = done && doneAt >= 今日 00:00 GMT+8
 
 function CommandBar({ tasks }: { tasks: Task[] }) {
   const active = tasks.filter(t =>
@@ -221,7 +220,7 @@ function CommandBar({ tasks }: { tasks: Task[] }) {
   ).length
   const todayStart = new Date()
   todayStart.setHours(0, 0, 0, 0)
-  const todayDone = tasks.filter(t => t.status === 'done' && new Date(t.updatedAt).getTime() >= todayStart.getTime()).length
+  const todayDone = tasks.filter(t => t.status === 'done' && t.doneAt && new Date(t.doneAt).getTime() >= todayStart.getTime()).length
 
   return (
     <div className="sprint-bar">

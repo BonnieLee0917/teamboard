@@ -32,6 +32,7 @@ export interface Task {
   createdAt: string
   updatedAt: string
   startedAt?: string
+  doneAt?: string
   gateResults: GateResult[]
   history: Array<{
     at: string
