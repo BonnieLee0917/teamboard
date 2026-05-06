@@ -41,7 +41,7 @@ app.post('/interactions', async (c) => {
 app.post('/events', async (c) => {
   const sig  = c.req.header('x-tb-sig') ?? ''
   const body = await c.req.text()
-  const ok = await verifyHmac(body, sig, c.env.HMAC_SHARED_SECRET)
+  const ok = await verifyHmac(body, sig, c.env.HMAC_SHARED_SECRET ?? '')
   if (!ok) return c.text('invalid hmac', 401)
 
   const evt = JSON.parse(body) as {

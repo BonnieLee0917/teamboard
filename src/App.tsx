@@ -424,17 +424,20 @@ export default function App() {
   const [data, setData] = useState<SprintState>(mockData)
   const [agents, setAgents] = useState<Agent[]>([])
   const [feedState, setFeedState] = useState<'loading' | 'ok' | 'polling-stale' | 'failed'>('loading')
+  const [lastSuccessAt, setLastSuccessAt] = useState<number | null>(null)
   const [expandedId, setExpandedId] = useState<string | null>(null)
   const [mobileTab, setMobileTab] = useState<'kanban' | 'members' | 'activity'>('kanban')
   const [apiErr, setApiErr] = useState<ApiError | null>(null)
-  const [onboardOpen, setOnboardOpen] = useState(false)
+  const [onboardOpen, setOnboardOpen] = useState<boolean>(() => {
+    try { return localStorage.getItem('tb_onboarded') !== 'v1' } catch { return true }
+  })
   const [onboardStep, setOnboardStep] = useState(0)
   const handleRef = useRef<import('./lib/api').PollHandle | null>(null)
 
   // 5s polling。feedState 每秒 tick 重评价，Vivian polling-stale banner attr(data-stale-text) 靠它
   useEffect(() => {
     handleRef.current = pollSprintState(
-      next => { setData(next); setApiErr(null) },
+      next => { setData(next); setApiErr(null); setLastSuccessAt(Date.now()) },
       err => { console.warn('[poll]', err); setApiErr(err) },
       5000,
     )
@@ -462,22 +465,10 @@ export default function App() {
     return () => { stopped = true }
   }, [])
 
-  useEffect(() => {
-    try {
-      if (localStorage.getItem('tb_onboarded') !== 'v1') {
-        setOnboardStep(0)
-        setOnboardOpen(true)
-      }
-    } catch {
-      setOnboardStep(0)
-      setOnboardOpen(true)
-    }
-  }, [])
-
   const closeOnboarding = () => {
     try {
       localStorage.setItem('tb_onboarded', 'v1')
-    } catch {}
+    } catch { /* localStorage 不可用（无痕模式等），静默失败 */ }
     setOnboardOpen(false)
     setOnboardStep(0)
   }
@@ -507,7 +498,7 @@ export default function App() {
             data-testid="onboard-help"
             aria-label="重看新手引导"
             title="重看新手引导"
-            onClick={() => { try { localStorage.removeItem('tb_onboarded') } catch {} ; setOnboardOpen(true); setOnboardStep(0) }}
+            onClick={() => { try { localStorage.removeItem('tb_onboarded') } catch { /* ignore */ } ; setOnboardOpen(true); setOnboardStep(0) }}
           >?</button>
         </div>
       </header>
@@ -524,7 +515,7 @@ export default function App() {
           data-testid="polling-stale-banner"
           style={{ background: '#fef9c3', color: '#854d0e', padding: '6px 16px', fontSize: 13, borderBottom: '1px solid #fde68a' }}
         >
-          ⚠️ 数据偏陈 · 最后一次同步 {handleRef.current?.lastSuccessAt ? timeAgo(new Date(handleRef.current.lastSuccessAt).toISOString()) : '未知'}
+          ⚠️ 数据偏陈 · 最后一次同步 {lastSuccessAt ? timeAgo(new Date(lastSuccessAt).toISOString()) : '未知'}
         </div>
       )}
       {feedState === 'failed' && (

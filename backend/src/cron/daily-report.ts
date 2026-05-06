@@ -35,7 +35,7 @@ export async function generateDailyReport(env: Env): Promise<void> {
   const metrics = { tasksCreated, tasksDone, blocked, agentBreakdown }
 
   // LLM ─ Workers AI
-  let summary = ''
+  let summary: string
   let model = '@cf/meta/llama-3.1-8b-instruct'
   try {
     const prompt = [
@@ -52,7 +52,7 @@ export async function generateDailyReport(env: Env): Promise<void> {
     } as never) as { response?: string }
     summary = res.response ?? ''
     if (!summary || summary.length < 30) throw new Error('llm output too short')
-  } catch (e) {
+  } catch {
     // 模板兜底
     summary = renderFallback(date, metrics)
     model = 'fallback-template'

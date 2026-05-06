@@ -9,6 +9,7 @@ export class RoomDO {
   private connections = new Set<Connection>()
 
   constructor(state: DurableObjectState, _env: Env) {
+    void _env
     this.state = state
   }
 
@@ -27,7 +28,7 @@ export class RoomDO {
     if (req.method === 'POST' && url.pathname === '/kick') {
       const n = this.connections.size
       for (const c of this.connections) {
-        try { c.ws.close(1012, 'kicked-by-test') } catch {}
+        try { c.ws.close(1012, 'kicked-by-test') } catch { /* ignore already-closed sockets */ }
       }
       this.connections.clear()
       return new Response(String(n))
@@ -50,7 +51,7 @@ export class RoomDO {
 
   private broadcast(payload: string) {
     for (const c of this.connections) {
-      try { c.ws.send(payload) } catch { this.connections.delete(c) }
+      try { c.ws.send(payload) } catch { this.connections.delete(c) /* ignore broken sockets */ }
     }
   }
 }
