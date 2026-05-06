@@ -37,18 +37,15 @@ const EMPTY_HERO: Record<TaskStatus, { icon: string; text: string }> = {
 const ONBOARD_STEPS = [
   {
     title: '👋 欢迎来到指挥台',
-    body: '这是小萌指挥 5 个 AI agent 的工作台。<br/>你可以在这里看到团队当下在干什么、派活给谁、收到回执。',
-    target: null,
+    body: '这是小萌指挥 5 个 AI agent 的工作台（Kane/Haaland/Vivian/Rose/Bonnie）。<br/>你可以在这里看到团队当下在干什么、派活给谁、收到回执。',
   },
   {
     title: '📋 看板：团队的实时状态',
-    body: '5 列分别是任务的不同阶段。<br/>已完成的任务 7 天后自动归档。',
-    target: 'kanban',
+    body: '5 列分别是任务的不同阶段：待开始 / 进行中 / 审核中 / 已完成 / 已阻塞。<br/>已完成的任务 7 天后自动归档。',
   },
   {
     title: '🚧 更多功能即将上线',
     body: '派活输入框、Agent 状态卡、AI 日报正在路上。<br/>现在你可以先浏览看板熟悉一下。',
-    target: 'topnav',
   },
 ] as const
 
@@ -247,27 +244,7 @@ function OnboardingOverlay({
   onStepChange: (next: number) => void
   onClose: () => void
 }) {
-  const [targetRect, setTargetRect] = useState<DOMRect | null>(null)
   const current = ONBOARD_STEPS[step]
-
-  useEffect(() => {
-    if (!open) return
-    const updateRect = () => {
-      if (!current.target) {
-        setTargetRect(null)
-        return
-      }
-      const el = document.querySelector(`[data-onboard-target="${current.target}"]`)
-      setTargetRect(el?.getBoundingClientRect() ?? null)
-    }
-    updateRect()
-    window.addEventListener('resize', updateRect)
-    window.addEventListener('scroll', updateRect, true)
-    return () => {
-      window.removeEventListener('resize', updateRect)
-      window.removeEventListener('scroll', updateRect, true)
-    }
-  }, [open, current.target])
 
   useEffect(() => {
     if (!open) return
@@ -285,17 +262,6 @@ function OnboardingOverlay({
 
   return (
     <div className="onboard-overlay" role="dialog" aria-modal="true" aria-label="TeamBoard 新手引导">
-      {targetRect && (
-        <div
-          className="onboard-spotlight"
-          style={{
-            left: Math.max(targetRect.left - 8, 0),
-            top: Math.max(targetRect.top - 8, 0),
-            width: targetRect.width + 16,
-            height: targetRect.height + 16,
-          }}
-        />
-      )}
       <div className="onboard-card">
         <div className="onboard-step" aria-label={`步骤 ${step + 1} / ${ONBOARD_STEPS.length}`}>
           {ONBOARD_STEPS.map((_, index) => (

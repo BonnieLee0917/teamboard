@@ -909,26 +909,11 @@ body {
   background: rgba(0, 0, 0, 0.55);
   pointer-events: auto;
 }
-.onboard-spotlight {
-  position: fixed;
-  border-radius: 6px;
-  /* punches a "hole" in the overlay using spotlight box-shadow trick */
-  box-shadow:
-    0 0 0 9999px rgba(0, 0, 0, 0.55),
-    0 0 0 2px oklch(0.75 0.12 200 / 0.6);
-  z-index: 9001;
-  pointer-events: none;
-  animation: spotlight-in 0.25s ease;
-}
-@keyframes spotlight-in {
-  from { opacity: 0; transform: scale(0.97); }
-  to   { opacity: 1; transform: scale(1); }
-}
 .onboard-card {
   position: fixed;
-  bottom: max(48px, 10vh);
+  top: 50%;
   left: 50%;
-  transform: translateX(-50%);
+  transform: translate(-50%, -50%);
   z-index: 9100;
   width: min(420px, calc(100vw - 32px));
   background: var(--bg-card);
@@ -940,8 +925,8 @@ body {
   animation: card-in 0.25s ease;
 }
 @keyframes card-in {
-  from { opacity: 0; transform: translateX(-50%) translateY(12px); }
-  to   { opacity: 1; transform: translateX(-50%) translateY(0); }
+  from { opacity: 0; transform: translate(-50%, calc(-50% + 12px)); }
+  to   { opacity: 1; transform: translate(-50%, -50%); }
 }
 .onboard-step {
   display: flex;
