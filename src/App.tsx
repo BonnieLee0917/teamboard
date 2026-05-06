@@ -25,6 +25,33 @@ const STATUS_LABELS: Record<TaskStatus, string> = {
   blocked: '已阻塞',
 }
 
+// Bonnie 5/6 v1.1 · 5 列空状态 hero 文案
+const EMPTY_HERO: Record<TaskStatus, { icon: string; text: string }> = {
+  pending:       { icon: '📋', text: '还没有任务<br/>试试派一个新任务' },
+  'in-progress': { icon: '🚀', text: '目前没人在跑活' },
+  review:        { icon: '👀', text: '没有待审核的产出' },
+  done:          { icon: '✅', text: '7 天内的成果会显示在这里<br/>之后自动归档' },
+  blocked:       { icon: '🟢', text: '团队畅通无阻' },
+}
+
+const ONBOARD_STEPS = [
+  {
+    title: '👋 欢迎来到指挥台',
+    body: '这是小萌指挥 5 个 AI agent 的工作台。<br/>你可以在这里看到团队当下在干什么、派活给谁、收到回执。',
+    target: null,
+  },
+  {
+    title: '📋 看板：团队的实时状态',
+    body: '5 列分别是任务的不同阶段。<br/>已完成的任务 7 天后自动归档。',
+    target: 'kanban',
+  },
+  {
+    title: '🚧 更多功能即将上线',
+    body: '派活输入框、Agent 状态卡、AI 日报正在路上。<br/>现在你可以先浏览看板熟悉一下。',
+    target: 'topnav',
+  },
+] as const
+
 const PRIORITY_COLORS: Record<string, string> = {
   P0: 'var(--priority-p0)',
   P1: 'var(--priority-p1)',
@@ -172,36 +199,107 @@ function KanbanColumn({ status, tasks, expandedId, onToggle }: {
           />
         ))}
         {tasks.length === 0 && (
-          <div className="col-empty">空</div>
+          <div className="col-empty kanban-col__empty" data-testid={`empty-${status}`}>
+            <div className="col-empty__icon">{EMPTY_HERO[status].icon}</div>
+            <div
+              className="col-empty__text"
+              dangerouslySetInnerHTML={{ __html: EMPTY_HERO[status].text }}
+            />
+          </div>
         )}
       </div>
     </div>
   )
 }
 
-// ─── SprintBar ────────────────────────────────────────────────────────────────
+// ─── CommandBar (formerly SprintBar) ──────────────────────────────────────────
+// Bonnie 5/6 v1.1: 去 Sprint 概念，改成「指挥台」语义
+//   active = todo+in_progress+review+blocked
+//   todayDone = done && updatedAt >= 今日 00:00 本地时区
+//   (前端 Task 类型无 doneAt，降级用 updatedAt — Bonnie 5/6 confirmed)
 
-function SprintBar({ tasks, sprintName }: { tasks: Task[]; sprintName: string }) {
-  const total = tasks.length
-  const done = tasks.filter(t => t.status === 'done').length
-  const inProgress = tasks.filter(t => t.status === 'in-progress').length
-  const blocked = tasks.filter(t => t.status === 'blocked').length
-  const pct = total > 0 ? Math.round((done / total) * 100) : 0
+function CommandBar({ tasks }: { tasks: Task[] }) {
+  const active = tasks.filter(t =>
+    t.status === 'pending' || t.status === 'in-progress' || t.status === 'review' || t.status === 'blocked'
+  ).length
+  const todayStart = new Date()
+  todayStart.setHours(0, 0, 0, 0)
+  const todayDone = tasks.filter(t => t.status === 'done' && new Date(t.updatedAt).getTime() >= todayStart.getTime()).length
 
   return (
     <div className="sprint-bar">
-      <div className="sprint-bar__left">
-        <span className="sprint-name">{sprintName}</span>
-        <div className="sprint-progress-track">
-          <div className="sprint-progress-fill" style={{ width: `${pct}%` }} />
-        </div>
-        <span className="sprint-pct">{pct}%</span>
-      </div>
       <div className="sprint-bar__stats">
-        <span className="stat stat--done">✓ {done} 完成</span>
-        <span className="stat stat--progress">◉ {inProgress} 进行中</span>
-        <span className="stat stat--blocked">⚠ {blocked} 阻塞</span>
-        <span className="stat stat--total">{total} 总计</span>
+        <span className="stat stat--progress">◉ 活跃 {active}</span>
+        <span className="stat stat--done">✓ 今日完成 {todayDone}</span>
+      </div>
+    </div>
+  )
+}
+
+function OnboardingOverlay({
+  open,
+  step,
+  onStepChange,
+  onClose,
+}: {
+  open: boolean
+  step: number
+  onStepChange: (next: number) => void
+  onClose: () => void
+}) {
+  const [targetRect, setTargetRect] = useState<DOMRect | null>(null)
+  const current = ONBOARD_STEPS[step]
+
+  useEffect(() => {
+    if (!open) return
+    const updateRect = () => {
+      if (!current.target) {
+        setTargetRect(null)
+        return
+      }
+      const el = document.querySelector(`[data-onboard-target="${current.target}"]`)
+      setTargetRect(el?.getBoundingClientRect() ?? null)
+    }
+    updateRect()
+    window.addEventListener('resize', updateRect)
+    window.addEventListener('scroll', updateRect, true)
+    return () => {
+      window.removeEventListener('resize', updateRect)
+      window.removeEventListener('scroll', updateRect, true)
+    }
+  }, [open, current.target])
+
+  if (!open) return null
+
+  return (
+    <div className="onboard-overlay" role="dialog" aria-modal="true" aria-label="TeamBoard 新手引导">
+      {targetRect && (
+        <div
+          className="onboard-spotlight"
+          style={{
+            left: Math.max(targetRect.left - 8, 0),
+            top: Math.max(targetRect.top - 8, 0),
+            width: targetRect.width + 16,
+            height: targetRect.height + 16,
+          }}
+        />
+      )}
+      <div className="onboard-card">
+        <div className="onboard-step">{step + 1} / {ONBOARD_STEPS.length}</div>
+        <h2 className="onboard-title">{current.title}</h2>
+        <p className="onboard-body" dangerouslySetInnerHTML={{ __html: current.body }} />
+        <div className="onboard-actions">
+          <button type="button" className="onboard-btn onboard-btn--ghost" onClick={onClose}>跳过</button>
+          {step < ONBOARD_STEPS.length - 1 ? (
+            <button type="button" className="onboard-btn onboard-btn--primary" onClick={() => onStepChange(step + 1)}>
+              下一步 →
+            </button>
+          ) : (
+            <button type="button" className="onboard-btn onboard-btn--primary" onClick={onClose}>
+              开始使用 ✓
+            </button>
+          )}
+        </div>
       </div>
     </div>
   )
@@ -329,6 +427,8 @@ export default function App() {
   const [expandedId, setExpandedId] = useState<string | null>(null)
   const [mobileTab, setMobileTab] = useState<'kanban' | 'members' | 'activity'>('kanban')
   const [apiErr, setApiErr] = useState<ApiError | null>(null)
+  const [onboardOpen, setOnboardOpen] = useState(false)
+  const [onboardStep, setOnboardStep] = useState(0)
   const handleRef = useRef<import('./lib/api').PollHandle | null>(null)
 
   // 5s polling。feedState 每秒 tick 重评价，Vivian polling-stale banner attr(data-stale-text) 靠它
@@ -362,6 +462,26 @@ export default function App() {
     return () => { stopped = true }
   }, [])
 
+  useEffect(() => {
+    try {
+      if (localStorage.getItem('tb_onboarded') !== 'v1') {
+        setOnboardStep(0)
+        setOnboardOpen(true)
+      }
+    } catch {
+      setOnboardStep(0)
+      setOnboardOpen(true)
+    }
+  }, [])
+
+  const closeOnboarding = () => {
+    try {
+      localStorage.setItem('tb_onboarded', 'v1')
+    } catch {}
+    setOnboardOpen(false)
+    setOnboardStep(0)
+  }
+
   const toggleExpanded = (id: string) =>
     setExpandedId(prev => prev === id ? null : id)
 
@@ -370,19 +490,34 @@ export default function App() {
   return (
     <div className="app" data-feed-state={feedState}>
       {/* Top nav */}
-      <header className="topnav">
+      <header className="topnav" data-onboard-target="topnav">
         <div className="topnav__brand">
           <span className="topnav__logo">⚡</span>
-          <span className="topnav__title">Team Dashboard</span>
-        </div>
-        <div className="topnav__center">
-          <span className="sprint-badge">{data.sprintName}</span>
+          <div className="topnav__titles">
+            <span className="topnav__title">指挥台 · TeamBoard</span>
+            <span className="topnav__subtitle">小萌的 5 人 AI 团队 · 实时同步</span>
+          </div>
         </div>
         <div className="topnav__right">
           <span className="last-update">刷新于 {timeAgo(data.updatedAt)}</span>
           <span className="live-dot" title={apiErr ? `API: ${apiErr.message}` : `${apiConfig.mode} · 5s polling`} style={apiErr ? { background: '#ef4444' } : undefined} />
+          <button
+            type="button"
+            className="topnav__help"
+            data-testid="onboard-help"
+            aria-label="重看新手引导"
+            title="重看新手引导"
+            onClick={() => { try { localStorage.removeItem('tb_onboarded') } catch {} ; setOnboardOpen(true); setOnboardStep(0) }}
+          >?</button>
         </div>
       </header>
+      <OnboardingOverlay
+        open={onboardOpen}
+        step={onboardStep}
+        onStepChange={setOnboardStep}
+        onClose={closeOnboarding}
+      />
+
       {/* Polling state banners (Vivian feed-states.md §4；Rose data-testid for smoke) */}
       {feedState === 'polling-stale' && (
         <div
@@ -416,9 +551,9 @@ export default function App() {
         </div>
       )}
 
-      {/* Sprint overview bar */}
+      {/* Command bar — 指挥台统计 */}
       <div className="sprint-bar-wrapper">
-        <SprintBar tasks={data.tasks} sprintName={data.sprintName} />
+        <CommandBar tasks={data.tasks} />
       </div>
 
       {/* Mobile tabs */}
@@ -440,6 +575,7 @@ export default function App() {
         <div
           className={`kanban-board ${mobileTab === 'kanban' ? 'mobile-visible' : 'mobile-hidden'}`}
           data-testid="kanban-board"
+          data-onboard-target="kanban"
         >
           {STATUSES.map(s => (
             <KanbanColumn

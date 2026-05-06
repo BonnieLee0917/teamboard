@@ -826,3 +826,176 @@ body {
 .app[data-feed-state="failed"] .activity-feed__list {
   filter: saturate(0.7);
 }
+
+/* ═══ v1.1 指挥台 · 2026-05-06 Bonnie spec ═══ */
+
+/* —— topnav: 副标题 + 帮助按鈕 —— */
+.topnav__titles {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.topnav__title {
+  font-weight: 700;
+  font-size: 15px;
+  letter-spacing: -0.3px;
+  color: var(--text-primary);
+  line-height: 1.2;
+}
+.topnav__subtitle {
+  font-size: 10px;
+  font-weight: 400;
+  color: var(--text-muted);
+  letter-spacing: 0.2px;
+  line-height: 1.2;
+}
+.topnav__help {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  font-family: var(--font-body);
+  flex-shrink: 0;
+}
+.topnav__help:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+  border-color: var(--text-secondary);
+}
+
+/* —— kanban column empty hero —— */
+.kanban-col__empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 32px 12px;
+  text-align: center;
+}
+.col-empty__icon {
+  font-size: 22px;
+  opacity: 0.65;
+}
+.col-empty__text {
+  font-size: 12px;
+  color: var(--text-muted);
+  line-height: 1.5;
+  opacity: 0.8;
+}
+
+/* —— onboarding overlay —— */
+.onboard-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9000;
+  /* full dim background — spotlight punches through via onboard-spotlight */
+  background: transparent;
+  pointer-events: none;
+}
+.onboard-overlay::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background: oklch(0 0 0 / 0.6);
+  pointer-events: auto;
+}
+.onboard-spotlight {
+  position: fixed;
+  border-radius: 6px;
+  /* punches a "hole" in the overlay using spotlight box-shadow trick */
+  box-shadow:
+    0 0 0 9999px oklch(0 0 0 / 0.6),
+    0 0 0 2px oklch(0.75 0.12 200 / 0.6);
+  z-index: 9001;
+  pointer-events: none;
+  animation: spotlight-in 0.25s ease;
+}
+@keyframes spotlight-in {
+  from { opacity: 0; transform: scale(0.97); }
+  to   { opacity: 1; transform: scale(1); }
+}
+.onboard-card {
+  position: fixed;
+  bottom: max(48px, 10vh);
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 9100;
+  width: min(440px, calc(100vw - 32px));
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 24px;
+  pointer-events: auto;
+  box-shadow: 0 8px 32px oklch(0 0 0 / 0.4);
+  animation: card-in 0.25s ease;
+}
+@keyframes card-in {
+  from { opacity: 0; transform: translateX(-50%) translateY(12px); }
+  to   { opacity: 1; transform: translateX(-50%) translateY(0); }
+}
+.onboard-step {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: var(--text-muted);
+  margin-bottom: 8px;
+  font-family: var(--font-mono);
+}
+.onboard-title {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0 0 10px;
+  letter-spacing: -0.3px;
+  line-height: 1.3;
+}
+.onboard-body {
+  font-size: 14px;
+  color: var(--text-secondary);
+  line-height: 1.65;
+  margin: 0 0 20px;
+}
+.onboard-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+.onboard-btn {
+  padding: 8px 16px;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  font-family: var(--font-body);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  min-height: 36px;
+}
+.onboard-btn--ghost {
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+}
+.onboard-btn--ghost:hover {
+  background: var(--bg-hover);
+  color: var(--text-secondary);
+}
+.onboard-btn--primary {
+  background: var(--text-primary);
+  border: 1px solid var(--text-primary);
+  color: var(--bg-card);
+}
+.onboard-btn--primary:hover {
+  opacity: 0.88;
+}
+
