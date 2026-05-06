@@ -429,7 +429,7 @@ export default function App() {
   const [mobileTab, setMobileTab] = useState<'kanban' | 'members' | 'activity'>('kanban')
   const [apiErr, setApiErr] = useState<ApiError | null>(null)
   const [onboardOpen, setOnboardOpen] = useState<boolean>(() => {
-    try { return localStorage.getItem('tb_onboarded') !== 'v1' } catch { return true }
+    try { return localStorage.getItem('tb_onboarded_v1') !== 'v1' } catch { return true }
   })
   const [onboardStep, setOnboardStep] = useState(0)
   const handleRef = useRef<import('./lib/api').PollHandle | null>(null)
@@ -467,7 +467,7 @@ export default function App() {
 
   const closeOnboarding = () => {
     try {
-      localStorage.setItem('tb_onboarded', 'v1')
+      localStorage.setItem('tb_onboarded_v1', 'v1')
     } catch { /* localStorage 不可用（无痕模式等），静默失败 */ }
     setOnboardOpen(false)
     setOnboardStep(0)
@@ -498,7 +498,7 @@ export default function App() {
             data-testid="onboard-help"
             aria-label="重看新手引导"
             title="重看新手引导"
-            onClick={() => { try { localStorage.removeItem('tb_onboarded') } catch { /* ignore */ } ; setOnboardOpen(true); setOnboardStep(0) }}
+            onClick={() => { try { localStorage.removeItem('tb_onboarded_v1') } catch { /* ignore */ } ; setOnboardOpen(true); setOnboardStep(0) }}
           >?</button>
         </div>
       </header>
