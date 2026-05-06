@@ -45,7 +45,7 @@ const ONBOARD_STEPS = [
   },
   {
     title: '🚧 更多功能即将上线',
-    body: '派活输入框、Agent 状态卡、AI 日报正在路上。<br/>现在你可以先浏览看板熟悉一下。',
+    body: '派活输入框、Agent 状态卡、AI 日报正在路上。<br/>现在你可以先浏览看板熟悉一下。点击右上角 ? 可以随时重看本教程。',
   },
 ] as const
 
@@ -277,7 +277,11 @@ function OnboardingOverlay({
         <h2 className="onboard-title">{current.title}</h2>
         <p className="onboard-body" dangerouslySetInnerHTML={{ __html: current.body }} />
         <div className="onboard-actions">
-          <button type="button" className="onboard-btn onboard-btn--ghost" onClick={onClose}>跳过</button>
+          {step === 0 ? (
+            <button type="button" className="onboard-btn onboard-btn--ghost" onClick={onClose}>跳过</button>
+          ) : (
+            <button type="button" className="onboard-btn onboard-btn--ghost" onClick={() => onStepChange(step - 1)}>← 上一步</button>
+          )}
           {step < ONBOARD_STEPS.length - 1 ? (
             <button type="button" className="onboard-btn onboard-btn--primary" onClick={() => onStepChange(step + 1)}>
               下一步 →
