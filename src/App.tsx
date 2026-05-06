@@ -269,6 +269,18 @@ function OnboardingOverlay({
     }
   }, [open, current.target])
 
+  useEffect(() => {
+    if (!open) return
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        event.preventDefault()
+        onClose()
+      }
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [open, onClose])
+
   if (!open) return null
 
   return (
@@ -285,7 +297,17 @@ function OnboardingOverlay({
         />
       )}
       <div className="onboard-card">
-        <div className="onboard-step">{step + 1} / {ONBOARD_STEPS.length}</div>
+        <div className="onboard-step" aria-label={`步骤 ${step + 1} / ${ONBOARD_STEPS.length}`}>
+          {ONBOARD_STEPS.map((_, index) => (
+            <span
+              key={index}
+              className={`onboard-dot ${index === step ? 'onboard-dot--active' : ''}`}
+              aria-hidden="true"
+            >
+              ●
+            </span>
+          ))}
+        </div>
         <h2 className="onboard-title">{current.title}</h2>
         <p className="onboard-body" dangerouslySetInnerHTML={{ __html: current.body }} />
         <div className="onboard-actions">
@@ -429,7 +451,7 @@ export default function App() {
   const [mobileTab, setMobileTab] = useState<'kanban' | 'members' | 'activity'>('kanban')
   const [apiErr, setApiErr] = useState<ApiError | null>(null)
   const [onboardOpen, setOnboardOpen] = useState<boolean>(() => {
-    try { return localStorage.getItem('tb_onboarded_v1') !== 'v1' } catch { return true }
+    try { return localStorage.getItem('tb_onboarded_v1') !== '1' } catch { return true }
   })
   const [onboardStep, setOnboardStep] = useState(0)
   const handleRef = useRef<import('./lib/api').PollHandle | null>(null)
@@ -467,7 +489,7 @@ export default function App() {
 
   const closeOnboarding = () => {
     try {
-      localStorage.setItem('tb_onboarded_v1', 'v1')
+      localStorage.setItem('tb_onboarded_v1', '1')
     } catch { /* localStorage 不可用（无痕模式等），静默失败 */ }
     setOnboardOpen(false)
     setOnboardStep(0)

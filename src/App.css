@@ -906,7 +906,7 @@ body {
   content: '';
   position: fixed;
   inset: 0;
-  background: oklch(0 0 0 / 0.6);
+  background: rgba(0, 0, 0, 0.55);
   pointer-events: auto;
 }
 .onboard-spotlight {
@@ -914,7 +914,7 @@ body {
   border-radius: 6px;
   /* punches a "hole" in the overlay using spotlight box-shadow trick */
   box-shadow:
-    0 0 0 9999px oklch(0 0 0 / 0.6),
+    0 0 0 9999px rgba(0, 0, 0, 0.55),
     0 0 0 2px oklch(0.75 0.12 200 / 0.6);
   z-index: 9001;
   pointer-events: none;
@@ -930,7 +930,7 @@ body {
   left: 50%;
   transform: translateX(-50%);
   z-index: 9100;
-  width: min(440px, calc(100vw - 32px));
+  width: min(420px, calc(100vw - 32px));
   background: var(--bg-card);
   border: 1px solid var(--border);
   border-radius: 12px;
@@ -944,13 +944,20 @@ body {
   to   { opacity: 1; transform: translateX(-50%) translateY(0); }
 }
 .onboard-step {
-  font-size: 11px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 1px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
   color: var(--text-muted);
-  margin-bottom: 8px;
-  font-family: var(--font-mono);
+  margin-bottom: 12px;
+}
+.onboard-dot {
+  font-size: 10px;
+  line-height: 1;
+  opacity: 0.35;
+}
+.onboard-dot--active {
+  opacity: 1;
+  color: var(--text-primary);
 }
 .onboard-title {
   font-size: 18px;
